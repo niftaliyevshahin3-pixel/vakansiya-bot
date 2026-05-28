@@ -1,0 +1,54 @@
+name: Günlük Elan Scraping
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      max_sehife:
+        description: "Neçə səhifə scraplansin?"
+        required: false
+        default: "5"
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Kodu çəkdir
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 quraşdır
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Asılılıqları quraşdır
+        run: pip install -r requirements.txt
+
+      - name: Mühit dəyişənlərini yüklə
+        run: |
+          echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" >> .env
+          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+          echo "PAYRIFF_API_KEY=${{ secrets.PAYRIFF_API_KEY }}" >> .env
+          echo "PAYRIFF_SECRET=${{ secrets.PAYRIFF_SECRET }}" >> .env
+          echo "ADMIN_IDS=${{ secrets.ADMIN_IDS }}" >> .env
+          echo "DB_YOLU=vakansiya.db" >> .env
+
+      - name: Verilənlər bazasını yüklə
+        uses: actions/cache@v4
+        with:
+          path: vakansiya.db
+          key: db-${{ github.run_number }}
+          restore-keys: db-
+
+      - name: Scraping apar
+        run: python run_scraper.py
+
+      - name: Verilənlər bazasını saxla
+        uses: actions/cache/save@v4
+        with:
+          path: vakansiya.db
+          key: db-${{ github.run_number }}
