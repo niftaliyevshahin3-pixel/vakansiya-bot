@@ -1,0 +1,59 @@
+name: Bot Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Kodu yoxla
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Syntax yoxla
+        run: |
+          python -m py_compile bot.py
+          python -m py_compile scraper.py
+          python -m py_compile database.py
+          python -m py_compile matcher.py
+          python -m py_compile cv_analiz.py
+          python -m py_compile payriff.py
+          echo "Bütün fayllar düzgündür"
+
+  deploy:
+    name: Railway-ə deploy et
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Railway CLI quraşdır
+        run: npm install -g @railway/cli
+
+      - name: Deploy et
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --detach
+
+      - name: Deploy bildirişi
+        if: success()
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ADMIN_IDS: ${{ secrets.ADMIN_IDS }}
+        run: |
+          python -c "
+          import requests, os
+          token = os.getenv('BOT_TOKEN')
+          for admin in os.getenv('ADMIN_IDS','').split(','):
+              if admin.strip():
+                  requests.post(
+                      f'https://api.telegram.org/bot{token}/sendMessage',
+                      json={'chat_id': int(admin), 'text': 'Bot yenilendi!'}
+                  )
+          "
